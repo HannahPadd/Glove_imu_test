@@ -179,17 +179,16 @@ int main(void)
         {
                 LOG_ERR("I2C bus %s is not ready!\n", i2c_led_controller.bus->name);
                 return -1;
-
-                set_led_purple();
-
-                // dump_lp5817_registers();
-
-                ret = init_buttons();
-                while (1)
-                {
-                        k_sleep(K_MSEC(1000));
-                }
-
-                return 0;
         }
+        set_led_purple();
+
+        // dump_lp5817_registers();
+
+        ret = init_buttons();
+        while (1)
+        {
+                k_sleep(K_MSEC(1000));
+        }
+
+        return 0;
 }
