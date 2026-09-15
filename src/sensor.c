@@ -6,11 +6,14 @@
 
 LOG_MODULE_REGISTER(sensor_scan, LOG_LEVEL_DBG);
 
-#define SPI_OP SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB | SPI_WORD_SET(8) | SPI_MODE_CPOL | SPI_MODE_CPHA
+#define SPI_OP SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB | SPI_WORD_SET(8)
 
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 
 #define IMU_NODE DT_NODELABEL(imu_spi)
+
+#define ICM45686_REG_WHO_AM_I 0x72
+#define SPI_READ_BIT 0x80
 
 static const struct spi_dt_spec imu_spec = SPI_DT_SPEC_GET(IMU_NODE, SPI_OP, 0);
 
@@ -70,41 +73,44 @@ void shift_pattern(const struct gpio_dt_spec *dsb, const struct gpio_dt_spec *cp
         uint8_t bit = (pattern >> i) & 0x01;
 
         gpio_pin_set_dt(dsb, bit);
-        k_busy_wait(10);
+        // k_busy_wait(10);
 
         gpio_pin_set_dt(cp, 1);
-        k_busy_wait(10);
+        // k_busy_wait(10);
         gpio_pin_set_dt(cp, 0);
-        k_busy_wait(10);
+        // k_busy_wait(10);
     }
     gpio_pin_set_dt(dsb, 0);
-    k_busy_wait(10);
+    k_busy_wait(5);
 }
 
-void imu_soft_reset(void)
+void imu_soft_reset_all(void)
 {
-    uint8_t tx_data[2];
-    struct spi_buf tx_buf = {.buf = tx_data, .len = 2};
+    uint8_t tx_data[2] = {0x7F, 0x02};
+    struct spi_buf tx_buf = {.buf = tx_data, .len = sizeof(tx_data)};
     const struct spi_buf_set tx = {.buffers = &tx_buf, .count = 1};
 
-    tx_data[0] = 0x7F;
-    tx_data[1] = 0x02;
-
-    shift_pattern(&reg0_dsb, &reg0_cp, 0xF7);
-
-    int err = spi_write_dt(&imu_spec, &tx);
-    if (err)
+    for (int i = 0; i < 8; i++)
     {
-        LOG_ERR("SPI reset write failed: %d", err);
-    }
-    else
-    {
-        LOG_INF("Sent soft reset to ICM-45686");
-    }
+        uint8_t pattern = (uint8_t)~(1u << (7 - i));
 
-    shift_pattern(&reg0_dsb, &reg0_cp, 0xFF);
+        shift_pattern(&reg0_dsb, &reg0_cp, pattern);
+        k_busy_wait(10);
 
-    k_msleep(10);
+        int err = spi_write_dt(&imu_spec, &tx);
+        if (err)
+        {
+            LOG_ERR("SPI reset write failed on channel %d: %d", i, err);
+        }
+        else
+        {
+            LOG_INF("Sent soft reset to ICM-45686 on channel %d", i);
+        }
+
+        shift_pattern(&reg0_dsb, &reg0_cp, 0xFF);
+
+        k_msleep(10);
+    }
 }
 
 int sensor_scan(void)
@@ -119,35 +125,44 @@ int sensor_scan(void)
     }
 
     init_shift_reg();
-    // imu_soft_reset();
+    // imu_soft_reset_all();
 
     while (1)
     {
 
-        uint8_t buf[3] = {0};
-        uint8_t tx_data[3] = {0};
-        struct spi_buf tx_buf = {.buf = tx_data, .len = 3};
+        uint8_t tx_data[2] = {ICM45686_REG_WHO_AM_I | SPI_READ_BIT, 0x00};
+        uint8_t rx_buf_data[2] = {0};
+
+        struct spi_buf tx_buf = {.buf = tx_data, .len = sizeof(tx_data)};
         const struct spi_buf_set tx = {.buffers = &tx_buf, .count = 1};
-        struct spi_buf rx_buf = {.buf = buf, .len = 3};
+
+        struct spi_buf rx_buf = {.buf = rx_buf_data, .len = sizeof(rx_buf_data)};
         const struct spi_buf_set rx = {.buffers = &rx_buf, .count = 1};
 
-        uint8_t id;
-        tx_data[0] = 0x72 | 0x80;
-        shift_pattern(&reg0_dsb, &reg0_cp, 0xFF);
-        shift_pattern(&reg0_dsb, &reg0_cp, 0xF7);
-        // err = spi_transceive_dt(&imu_spec, &tx, &rx);
-        err = spi_write_dt(&imu_spec, &tx);
-        shift_pattern(&reg0_dsb, &reg0_cp, 0xFF);
-        shift_pattern(&reg0_dsb, &reg0_cp, 0xF7);
-        err = spi_read_dt(&imu_spec, &rx);
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 8; i++)
         {
-            LOG_INF("Contents of bufffer %d, 0x%02X", i, buf[i]);
+            LOG_INF("Scanning IMU: %d", i);
+            uint8_t pattern = (uint8_t)~(1u << (7 - i));
+
+            shift_pattern(&reg0_dsb, &reg0_cp, pattern);
+            k_busy_wait(5);
+
+            err = spi_transceive_dt(&imu_spec, &tx, &rx);
+            if (err)
+            {
+                LOG_ERR("SPI Transceive failed on %d with code %d", i, err);
+            }
+
+            for (int j = 0; j < sizeof(rx_buf_data); j++)
+            {
+                LOG_INF("  rx_buf[%d] = 0x%02X", j, rx_buf_data[j]);
+            }
+
+            LOG_INF("IMU %d WHO_AM_I = 0x%02X (Expected: 0xE9)", i, rx_buf_data[1]);
+
+            shift_pattern(&reg0_dsb, &reg0_cp, 0xFF);
         }
-        id = buf[1] ? buf[1] : buf[2];
-        LOG_DBG("Read value: 0x%02X, 0x%02X, 0x%02X (0x%02X)", buf[0], buf[1], buf[2], id);
-        shift_pattern(&reg0_dsb, &reg0_cp, 0xFF);
-        k_sleep(K_MSEC(50000));
+        k_sleep(K_MSEC(30000));
     }
 
     return 0;
