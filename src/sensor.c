@@ -23,7 +23,7 @@ static const struct gpio_dt_spec reg0_cp = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, re
 static const struct gpio_dt_spec reg1_dsb = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, reg1_dsb_gpios);
 static const struct gpio_dt_spec reg1_cp = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, reg1_cp_gpios);
 
-static const struct gpio_dt_spec imu_int = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, imu_int_gpios);
+// static const struct gpio_dt_spec imu_int = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, imu_int_gpios);
 
 static struct k_thread sensor_thread_id;
 static K_THREAD_STACK_DEFINE(sensor_thread_id_stack, 1024);
