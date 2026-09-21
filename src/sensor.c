@@ -81,7 +81,7 @@ void shift_pattern(const struct gpio_dt_spec *dsb, const struct gpio_dt_spec *cp
         // k_busy_wait(10);
     }
     gpio_pin_set_dt(dsb, 0);
-    k_busy_wait(5);
+    k_busy_wait(10);
 }
 
 void imu_soft_reset_all(void)
@@ -145,9 +145,10 @@ int sensor_scan(void)
             uint8_t pattern = (uint8_t)~(1u << (7 - i));
 
             shift_pattern(&reg0_dsb, &reg0_cp, pattern);
-            k_busy_wait(5);
+            k_busy_wait(10);
 
             err = spi_transceive_dt(&imu_spec, &tx, &rx);
+            k_busy_wait(10);
             if (err)
             {
                 LOG_ERR("SPI Transceive failed on %d with code %d", i, err);
@@ -158,9 +159,34 @@ int sensor_scan(void)
                 LOG_INF("  rx_buf[%d] = 0x%02X", j, rx_buf_data[j]);
             }
 
-            LOG_INF("IMU %d WHO_AM_I = 0x%02X (Expected: 0xE9)", i, rx_buf_data[1]);
+            LOG_INF("Register 1 IMU %d WHO_AM_I = 0x%02X (Expected: 0xE9)", i, rx_buf_data[1]);
 
             shift_pattern(&reg0_dsb, &reg0_cp, 0xFF);
+        }
+
+        for (int i = 0; i < 8; i++)
+        {
+            LOG_INF("Scanning IMU: %d", i);
+            uint8_t pattern = (uint8_t)~(1u << (7 - i));
+
+            shift_pattern(&reg1_dsb, &reg1_cp, pattern);
+            k_busy_wait(10);
+
+            err = spi_transceive_dt(&imu_spec, &tx, &rx);
+            k_busy_wait(10);
+            if (err)
+            {
+                LOG_ERR("SPI Transceive failed on %d with code %d", i, err);
+            }
+
+            for (int j = 0; j < sizeof(rx_buf_data); j++)
+            {
+                LOG_INF("  rx_buf[%d] = 0x%02X", j, rx_buf_data[j]);
+            }
+
+            LOG_INF("Register 2 IMU %d WHO_AM_I = 0x%02X (Expected: 0xE9)", i, rx_buf_data[1]);
+
+            shift_pattern(&reg1_dsb, &reg1_cp, 0xFF);
         }
         k_sleep(K_MSEC(30000));
     }

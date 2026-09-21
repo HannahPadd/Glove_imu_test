@@ -2,13 +2,12 @@
 #include <nordic/nrf54l15_cpuapp.dtsi>
 #include "slimevrglove-pinctrl.dtsi"
 
-#include <zephyr/dt-bindings/sensor/icm45686.h>
-
 &pinctrl {
 	/omit-if-no-ref/ spi00_default: spi00_default {
 		group1 {
 			psels = <NRF_PSEL(SPIM_SCK, 2, 1)>,
 					<NRF_PSEL(SPIM_MOSI, 2, 2)>;
+			nordic,drive-mode = <NRF_DRIVE_E0E1>;
 		};
 
 		group2 {
@@ -18,27 +17,6 @@
 	};
 
 	/omit-if-no-ref/ spi00_sleep: spi00_sleep {
-		group1 {
-			psels = <NRF_PSEL(SPIM_SCK, 2, 1)>,
-					<NRF_PSEL(SPIM_MOSI, 2, 2)>,
-					<NRF_PSEL(SPIM_MISO, 2, 4)>;
-			low-power-enable;
-		};
-	};
-
-	/omit-if-no-ref/ spi22_default: spi22_default {
-		group1 {
-			psels = <NRF_PSEL(SPIM_SCK, 2, 1)>,
-					<NRF_PSEL(SPIM_MOSI, 2, 2)>;
-		};
-
-		group2 {
-			psels = <NRF_PSEL(SPIM_MISO, 2, 4)>;
-			bias-pull-up;
-		};
-	};
-
-	/omit-if-no-ref/ spi22_sleep: spi22_sleep {
 		group1 {
 			psels = <NRF_PSEL(SPIM_SCK, 2, 1)>,
 					<NRF_PSEL(SPIM_MOSI, 2, 2)>,
@@ -102,11 +80,11 @@
 	};
 
 	zephyr,user {
+		int0-gpios = <&gpio0 2 0>;
 		reg0-dsb-gpios = <&gpio1 9 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>;
 		reg0-cp-gpios = <&gpio1 8 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>;
 		reg1-dsb-gpios = <&gpio1 12 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>;
 		reg1-cp-gpios = <&gpio1 11 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>;
-		imu-int-gpios = <&gpio0 2 GPIO_PULL_DOWN>;
 		multiple-imus = <1>;
 	};
 
@@ -217,29 +195,12 @@
 	pinctrl-1 = <&spi00_sleep>;
 	pinctrl-names = "default", "sleep";
 
-	/*
-
-	 * imu_spi: imu_spi@0 {
-	 * status = "okay";
-	 * compatible = "vnd,spi-device";
-	 * label = "imu-spi";
-	 * reg = <0>;
-	 * spi-max-frequency = <DT_FREQ_M(16)>;
-	 * };
-	 */
-	imu_spi: icm45686@0 {
+	imu_spi: imu_spi@0 {
 		status = "okay";
-		compatible = "invensense,icm45686";
+		compatible = "vnd,spi-device";
 		label = "imu-spi";
-		accel-pwr-mode = <ICM45686_DT_ACCEL_LN>;
-		accel-fs = <ICM45686_DT_ACCEL_FS_32>;
-		accel-odr = <ICM45686_DT_ACCEL_ODR_800>;
-		gyro-pwr-mode = <ICM45686_DT_GYRO_LN>;
-		gyro-fs = <ICM45686_DT_GYRO_FS_4000>;
-		gyro-odr = <ICM45686_DT_GYRO_ODR_800>;
 		reg = <0>;
-		spi-max-frequency = <DT_FREQ_M(2)>;
-		//spi-max-frequency = <400000>;
+		spi-max-frequency = <DT_FREQ_M(16)>;
 	};
 };
 #include <nordic/nrf54l15_partition.dtsi>
