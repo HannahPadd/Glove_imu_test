@@ -4,7 +4,7 @@
 
 #include "sensor.h"
 
-LOG_MODULE_REGISTER(sensor_scan, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(sensor_scan, LOG_LEVEL_INF);
 
 #define SPI_OP SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB | SPI_WORD_SET(8)
 
@@ -28,7 +28,7 @@ static const struct gpio_dt_spec reg1_cp = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, re
 static struct k_thread sensor_thread_id;
 static K_THREAD_STACK_DEFINE(sensor_thread_id_stack, 1024);
 
-K_THREAD_DEFINE(sensor_init_thread_id, 512, sensor_scan, NULL, NULL, NULL, 1, 0, 0);
+// K_THREAD_DEFINE(sensor_init_thread_id, 512, sensor_scan, NULL, NULL, NULL, 1, 0, 0);
 
 int init_shift_reg(void)
 {
