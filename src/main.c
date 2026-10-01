@@ -88,24 +88,19 @@ void set_led_purple(void)
                 return;
         }
 
-        // Set Max current
         write_to_i2c(0x01, 0x01);
 
-        // Enable OUT0, OUT1, OUT2
         write_to_i2c(0x02, 0x07);
 
-        // Set Dot Correction (0x14 - 0x16) to max scaling (0xFF = 100%)
-        write_to_i2c(0x14, 0x01); // OUT0_DC (Red)
-        write_to_i2c(0x15, 0x00); // OUT1_DC (Green)
-        write_to_i2c(0x16, 0x01); // OUT2_DC (Blue)
+        write_to_i2c(0x14, 0x01);
+        write_to_i2c(0x15, 0x00);
+        write_to_i2c(0x16, 0x01);
 
-        // Set Manual PWM Brightness (0x18 - 0x1A)
         LOG_INF("Settings LED colours");
-        write_to_i2c(0x18, 0xFF); // OUT0_PWM (Red) = 100%
-        write_to_i2c(0x19, 0x00); // OUT1_PWM (Green) = 0%
-        write_to_i2c(0x1A, 0xFF); // OUT2_PWM (Blue) = 100%
+        write_to_i2c(0x18, 0xFF);
+        write_to_i2c(0x19, 0x00);
+        write_to_i2c(0x1A, 0xFF);
 
-        // Push settings to output latch: UPDATE_CMD (0x0F) requires key 0x55
         write_to_i2c(0x0F, 0x55);
 }
 
@@ -168,27 +163,27 @@ Repeat
 
 int main(void)
 {
-        int ret;
+        // int ret;
 
-        k_work_init(&button_work, button_work_handler);
+        // k_work_init(&button_work, button_work_handler);
 
-        gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin));
-        gpio_add_callback(button.port, &button_cb_data);
+        // gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin));
+        // gpio_add_callback(button.port, &button_cb_data);
 
-        if (!device_is_ready(i2c_led_controller.bus))
-        {
-                LOG_ERR("I2C bus %s is not ready!\n", i2c_led_controller.bus->name);
-                return -1;
-        }
-        set_led_purple();
+        // if (!device_is_ready(i2c_led_controller.bus))
+        // {
+        //         LOG_ERR("I2C bus %s is not ready!\n", i2c_led_controller.bus->name);
+        //         return -1;
+        // }
+        // set_led_purple();
 
-        // dump_lp5817_registers();
+        // // dump_lp5817_registers();
 
-        ret = init_buttons();
-        while (1)
-        {
-                k_sleep(K_MSEC(1000));
-        }
+        // ret = init_buttons();
+        // while (1)
+        // {
+        //         k_sleep(K_MSEC(1000));
+        // }
 
-        return 0;
+        // return 0;
 }

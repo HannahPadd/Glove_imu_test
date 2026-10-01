@@ -368,8 +368,8 @@ void connection_write_packet_6() // reduced precision quat and accel with button
 		*buf = timeout_time < 1 ? 1 : timeout_time;
 	// if (k_ticks_to_ms_floor64(sys_get_battery_remaining_time_estimate()) < 60000 && timeout_time == UINT16_MAX)
 	// 	timeout_time = UINT16_MAX - 1;
-	data[15] = 0;														// rssi (supplied by receiver)
-	if (tracker_button && k_uptime_ticks() > button_update_time + 1000) // attempt to send button press for 1000 ms
+	data[15] = 0;														 // rssi (supplied by receiver)
+	if (tracker_button && k_uptime_get_32() > button_update_time + 1000) // attempt to send button press for 1000 ms
 	{
 		tracker_button = 0;
 		button_update_time = 0;
@@ -402,8 +402,8 @@ void connection_write_packet_7() // button and sleep time
 	// buf[0] = TO_FIXED_7(sensor_a[0]);
 	// buf[1] = TO_FIXED_7(sensor_a[1]);
 	// buf[2] = TO_FIXED_7(sensor_a[2]);
-	data[15] = 0;														// rssi (supplied by receiver)
-	if (tracker_button && k_uptime_ticks() > button_update_time + 1000) // attempt to send button press for 1000 ms
+	data[15] = 0;														 // rssi (supplied by receiver)
+	if (tracker_button && k_uptime_get_32() > button_update_time + 1000) // attempt to send button press for 1000 ms
 	{
 		tracker_button = 0;
 		button_update_time = 0;
@@ -428,6 +428,7 @@ static int64_t last_status2_time = 0;
 
 void connection_thread(void)
 {
+	return;
 	uint8_t data_copy[ESB_PACKET_MAX_SIZE];
 	while (1)
 	{

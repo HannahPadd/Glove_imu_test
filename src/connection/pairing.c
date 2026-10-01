@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <hal/nrf_clock.h>
+#include <zephyr/irq.h>
 
 LOG_MODULE_REGISTER(pairing, LOG_LEVEL_INF);
 
@@ -44,7 +46,7 @@ void pairing_restore(void)
 
 bool pairing_find_dongles_to_pair()
 {
-    uint64_t start = k_uptime_ticks();
+    uint64_t start = k_uptime_get_32();
     esb_set_tracker_state(PAIRING_FIND_DONGLES);
     // set_led(SYS_LED_PATTERN_SHORT, SYS_LED_PRIORITY_PAIR);
     // Find dongles around us
@@ -72,7 +74,7 @@ bool pairing_find_dongles_to_pair()
     memset(discovered_dongles, 0, sizeof(struct pairing_discovery_t) * ESB_CHANNELS_AMOUNT);
     // TODO Move PAIRING_FIND_DONGLES to CONFIG
     // Wait for any dongle for up to 30 seconds, but continue if we find any in the first 2 seconds
-    while (esb_get_tracker_state() == PAIRING_FIND_DONGLES && start + ESB_SEARCH_TIMEOUT > k_uptime_ticks())
+    while (esb_get_tracker_state() == PAIRING_FIND_DONGLES && start + ESB_SEARCH_TIMEOUT > k_uptime_get_32())
     {
         // Gather dongles for 2 seconds
         // TODO Move ESB_SEARCH_DONGLES_PAIRING to CONFIG
@@ -109,7 +111,7 @@ void pairing_dongle_found(const struct esb_payload *payload)
                 dg->rssi = payload->rssi;
                 dg->flags = payload->data[9];
                 dg->response = 255;
-                dg->response_time = k_uptime_ticks();
+                dg->response_time = k_uptime_get_32();
                 LOG_INF("New dongle for pairing: %012llX, ch %d, rssi %d, flags %d", dongle_hwid, channel, payload->rssi, payload->data[9]);
                 break;
             }
@@ -226,14 +228,20 @@ bool pairing_pick_dongle_and_pair(void)
             prepare_pair_payload();
             esb_set_channel(current_pairing_dongle.channel);
             esb_set_receiver_addr(current_pairing_dongle.dongle_hwid);
+            nrf_clock_event_clear(NRF_CLOCK, NRF_CLOCK_EVENT_HFCLKSTARTED);
+            nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_HFCLKSTART);
+            while (!nrf_clock_event_check(NRF_CLOCK, NRF_CLOCK_EVENT_HFCLKSTARTED))
+            {
+                LOG_INF("has HFLCK stated: %d", nrf_clock_event_check(NRF_CLOCK, NRF_CLOCK_EVENT_HFCLKSTARTED));
+                k_msleep(10);
+            }
             esb_initialize(true, false);
-            uint32_t start = k_uptime_ticks();
-            while (start + 2000 > k_uptime_ticks() && esb_get_tracker_state() == PAIRING_PICK_DONGLE)
+            uint32_t start = k_uptime_get_32();
+            while (start + 2000 > k_uptime_get_32() && esb_get_tracker_state() == PAIRING_PICK_DONGLE)
             {
                 // TODO If we use channel hopping, we need to do something with timings here
                 // We should sync our timer to the received packets
-                esb_flush_rx();
-                esb_flush_tx();
+                LOG_INF("Clock is running: %d, irq %d", clocks_get_status(), irq_is_enabled(138));
                 LOG_INF("Trying to pair");
                 esb_write_payload(&tx_payload_pair);
                 int err = esb_start_tx();

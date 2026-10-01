@@ -43,7 +43,7 @@
 LOG_MODULE_REGISTER(esb_event, LOG_LEVEL_DBG);
 
 static void esb_thread(void);
-K_THREAD_DEFINE(esb_thread_id, 1024, esb_thread, NULL, NULL, NULL, 8, 0, 0);
+K_THREAD_DEFINE(esb_thread_id, 1024, esb_thread, NULL, NULL, NULL, -2, 0, 0);
 
 static struct esb_payload rx_payload;
 static struct esb_payload tx_payload = ESB_EMPTY_PAYLOAD(0, ESB_PACKET_MAX_SIZE);
@@ -109,7 +109,8 @@ void event_handler(struct esb_evt const *event)
 	switch (event->evt_id)
 	{
 	case ESB_EVENT_TX_SUCCESS:
-		last_tx_success = k_uptime_ticks();
+		LOG_INF("TX SUCCESS");
+		last_tx_success = k_uptime_get_32();
 		if (tx_errors > TX_ERROR_CLEAR_RATE)
 			tx_errors -= TX_ERROR_CLEAR_RATE;
 		else
@@ -117,14 +118,15 @@ void event_handler(struct esb_evt const *event)
 		LOG_DBG("TX SUCCESS");
 		break;
 	case ESB_EVENT_TX_FAILED:
-		last_tx_fail = k_uptime_ticks();
+		LOG_INF("TX FAILED");
+		last_tx_fail = k_uptime_get_32();
 		if (tx_errors < TX_ERROR_MAX)
 			tx_errors++;
 		packets_failed++;
 		LOG_DBG("TX FAILED, last packet %d", last_packet_sequence);
 		break;
 	case ESB_EVENT_RX_RECEIVED:
-		LOG_DBG("RX");
+		LOG_DBG("RX RECEIVED");
 		int err = 0;
 		while (!err) // zero, rx success
 		{
@@ -248,12 +250,12 @@ void event_handler(struct esb_evt const *event)
 				}
 			}
 			// if(last_received_packet != 0) {
-			// 	uint64_t diff = k_uptime_ticks() - last_received_packet;
+			// 	uint64_t diff = k_uptime_get_32() - last_received_packet;
 			// 	if(diff > 35) {
 			// 		LOG_WRN("Packet gap of %dms", diff);
 			// 	}
 			// }
-			last_received_packet = k_uptime_ticks();
+			last_received_packet = k_uptime_get_32();
 			connection_motion_ack(packet_number);
 		}
 		break;
@@ -263,15 +265,15 @@ void event_handler(struct esb_evt const *event)
 void esb_set_tracker_state(enum esb_tracker_state_t state)
 {
 	enum esb_tracker_state_t old_state = esb_tracker_state;
-	esb_tracker_state_last_change = k_uptime_ticks();
+	esb_tracker_state_last_change = k_uptime_get_32();
 	esb_tracker_state = state;
 	LOG_INF("ESB state change: %d -> %d", old_state, state);
 }
 
 bool esb_wait_state_change(enum esb_tracker_state_t from_state, uint32_t timeout_ms)
 {
-	uint64_t start = k_uptime_ticks();
-	while (esb_tracker_state == from_state && start + timeout_ms > k_uptime_ticks())
+	uint64_t start = k_uptime_get_32();
+	while (esb_tracker_state == from_state && start + timeout_ms > k_uptime_get_32())
 	{
 		k_msleep(1);
 	}
@@ -467,7 +469,7 @@ void esb_write(uint8_t *data, uint8_t packet_sequnce)
 void esb_ping(uint64_t receiver_addr, uint8_t channel)
 {
 	ping_request.target = receiver_addr;
-	ping_request.time = k_uptime_ticks();
+	ping_request.time = k_uptime_get_32();
 	ping_request.channel = channel;
 	ping_request.return_sate = esb_get_tracker_state();
 	esb_set_tracker_state(SEND_PING);
@@ -507,8 +509,8 @@ bool find_dongle()
 	clocks_start();
 	esb_initialize(false, true);
 	esb_start_rx();
-	uint64_t start = k_uptime_ticks();
-	while (!dongle_found && start + ESB_SEARCH_TIMEOUT > k_uptime_ticks())
+	uint64_t start = k_uptime_get_32();
+	while (!dongle_found && start + ESB_SEARCH_TIMEOUT > k_uptime_get_32())
 	{
 		k_msleep(20);
 		if (esb_get_tracker_state() != FIND_DONGLE)
@@ -538,8 +540,8 @@ void connect_to_dongle()
 	clocks_allow_stopping(false);
 	clocks_start();
 	esb_initialize(true, false);
-	uint64_t start = k_uptime_ticks();
-	while (esb_get_tracker_state() == DONGLE_CONNECT && start + 1000 > k_uptime_ticks())
+	uint64_t start = k_uptime_get_32();
+	while (esb_get_tracker_state() == DONGLE_CONNECT && start + 1000 > k_uptime_get_32())
 	{
 		populate_connect_payload();
 		esb_write_current();
@@ -616,7 +618,7 @@ static void esb_thread(void)
 			// only raise error while not potentially communicating by usb
 			// if (!get_status(SYS_STATUS_CONNECTION_ERROR) && (!use_hid || !get_status(SYS_STATUS_USB_CONNECTED)))
 			// 	set_status(SYS_STATUS_CONNECTION_ERROR, true);
-			// if (use_shutdown && k_uptime_ticks() - last_tx_success > CONFIG_3_SETTINGS_READ(CONFIG_3_CONNECTION_TIMEOUT_DELAY)) // shutdown if receiver is not detected // TODO: is shutdown necessary if usb is connected at the time?
+			// if (use_shutdown && k_uptime_get_32() - last_tx_success > CONFIG_3_SETTINGS_READ(CONFIG_3_CONNECTION_TIMEOUT_DELAY)) // shutdown if receiver is not detected // TODO: is shutdown necessary if usb is connected at the time?
 			// {
 			// 	LOG_WRN("No response from receiver in %dm", CONFIG_3_SETTINGS_READ(CONFIG_3_CONNECTION_TIMEOUT_DELAY) / 60000);
 			// 	sys_request_system_off(false);
@@ -636,7 +638,7 @@ static void esb_thread(void)
 		// 	{
 		// 		esb_set_tracker_state(FIND_DONGLE); // Try to find dongle again
 		// 	}
-		// 	else if (tx_errors < TX_ERROR_THRESHOLD && get_status(SYS_STATUS_CONNECTION_ERROR) && k_uptime_ticks() - last_tx_fail > 3000) // TODO: there is possibly some race condition causing tx_error to potentially be above zero more often than not, so the check is more lenient; tx_error under threshold and last errors above threshold was not recent
+		// 	else if (tx_errors < TX_ERROR_THRESHOLD && get_status(SYS_STATUS_CONNECTION_ERROR) && k_uptime_get_32() - last_tx_fail > 3000) // TODO: there is possibly some race condition causing tx_error to potentially be above zero more often than not, so the check is more lenient; tx_error under threshold and last errors above threshold was not recent
 		// 	{
 		// 		set_status(SYS_STATUS_CONNECTION_ERROR, false);
 		// 	}

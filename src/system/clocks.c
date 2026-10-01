@@ -86,17 +86,12 @@ int clocks_start(void)
 			LOG_ERR("Clock could not be started: %d", res);
 			return res;
 		}
-		if (err && ++fetch_attempts > 10)
+		if (err && ++fetch_attempts > 50)
 		{
 			LOG_WRN_ONCE("Unable to fetch Clock request result: %d", err);
 			return err;
 		}
 	} while (err);
-
-#if defined(NRF54L15_XXAA)
-	/* MLTPAN-20 */
-	nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_PLLSTART);
-#endif /* defined(NRF54L15_XXAA) */
 
 	LOG_DBG("HF clock started");
 	clocks_status = true;
